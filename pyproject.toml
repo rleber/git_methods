@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]               
+
+[project]
+name = "git_methods"
+description = "A class defining useful methods for working with Git repositories"
+authors = [
+    {name="Richard LeBer", email = "richard.leber@gmail.com"}
+]
+license = "MIT"
+license-files = ["LICENSE.md"]
+readme = "README.md"
+requires-python = ">=3.12"
+dynamic = ["version", "dependencies"]
+# TODO use `pipreqs` to generate requirements.txt
+
+# [project.urls] # TODO Complete or remove
+# Homepage = "url"
+# Documentation = "url"
+# Repository = "url"
+# Etc. See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#urls
+
+[tool.setuptools.dynamic]
+version = {attr = "git_methods.__version__"}
+dependencies = {file = ["requirements.txt"]}
