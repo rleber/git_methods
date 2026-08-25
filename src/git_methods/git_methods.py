@@ -248,6 +248,9 @@ class Repo:
         # Return True if the exit code is 0 (the reference exists)
         return result.returncode == 0
 
+    def remotes(self) -> git.util.IterableList[git.Remote]:
+        return self.repo.remotes
+
     def get_upstream_branch(self, local_branch: str) -> str | None:
         """Get the name of the upstream branch for a local branch"""
         parts = self.get_upstream_branch_parts(self, local_branch)
@@ -321,12 +324,15 @@ class Repo:
                 f"Error: Remote '{remote_name}' does not exist in {self.repo_path}"
             )
 
-    def logging(self):
+    def logging(self) -> bool:
+        """Should we be logging things?"""
         return self.verbose or self.dry_run
 
-    def log(self, message):
+    def log(self, message: str) -> None:
+        """Print things to the log if we're being verbose"""
         if self.logging():
             print(f"{self.repo_path}: {message}")
 
-    def enabled(self):
+    def enabled(self) -> None:
+        """Are we actually executing changes, or just doing a dry run?"""
         return not (self.dry_run)
