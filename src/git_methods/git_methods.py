@@ -261,7 +261,3 @@ class Repo:
 
     def enabled(self):
         return not (self.dry_run)
-
-
-if __name__ == "__main__":
-    main_cli()
