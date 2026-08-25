@@ -248,7 +248,7 @@ class Repo:
         # Return True if the exit code is 0 (the reference exists)
         return result.returncode == 0
 
-    def remotes(self) -> git.util.IterableList[git.Remote]:
+    def remotes(self) -> list[git.Remote]:
         return self.repo.remotes
 
     def get_upstream_branch(self, local_branch: str) -> str | None:
