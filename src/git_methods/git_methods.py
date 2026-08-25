@@ -253,14 +253,14 @@ class Repo:
 
     def get_upstream_branch(self, local_branch: str) -> str | None:
         """Get the name of the upstream branch for a local branch"""
-        parts = self.get_upstream_branch_parts(self, local_branch)
+        parts = self.get_upstream_branch_parts(local_branch)
         if not parts:
             return None
         return parts["remote"]
 
     def get_upstream_repository(self, local_branch: str) -> str | None:
         """Get the repository name of the upstream branch for a local branch"""
-        parts = self.get_upstream_branch_parts(self, local_branch)
+        parts = self.get_upstream_branch_parts(local_branch)
         if not parts:
             return None
         return parts["remote"]
@@ -270,7 +270,7 @@ class Repo:
         Get the parts of the qualified upstream branch ref for a local branch
         Returns a dict: {"remote": str, "branch": str}
         """
-        qualified_name = self.get_qualified_upstream_branch(self, local_branch)
+        qualified_name = self.get_qualified_upstream_branch(local_branch)
         if not qualified_name:
             return None
         if match := re.fullmatch(r"(.*)/(.*)", qualified_name):
