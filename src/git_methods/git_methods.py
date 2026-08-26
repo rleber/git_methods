@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import git
+from rich import print
 
 
 class GitError(RuntimeError):
@@ -48,12 +49,25 @@ class GitMoveBranchCollisionError(GitMoveError):
 
 class Repo:
     def __init__(
-        self, repo_path: Path | str, dry_run: bool = False, verbose: bool = False
+        self,
+        repo_path: Path | str,
+        dry_run: bool = False,
+        verbose: bool = False,
+        rich: bool = False,
     ):
         self.repo_path = Path(repo_path)
         self.dry_run = dry_run
         self.verbose = verbose
         self.repo = self.get_repo(repo_path)
+        self._rich = rich
+
+    @property
+    def rich(self):
+        return self._rich
+
+    @rich.setter
+    def rich(self, value: bool):
+        self._rich = value
 
     @classmethod
     def is_repo(cls, path: Path) -> bool:
@@ -142,7 +156,7 @@ class Repo:
             raise GitMoveMissingBranchError(
                 f"Can't find branch {old} in repo {self.repo_path}"
             )
-        self.log(f"Move local branch {old} to {new}")
+        self.log(f"[green]Moved local branch {old} to {new}[/green]")
         if self.enabled():
             try:
                 os.chdir(self.repo_path)
@@ -178,7 +192,7 @@ class Repo:
                 f"Upstream branch {upstream_repo}/{new_upstream_branch} already exists"
             )
         self.log(
-            f"Move upstream branch of {local} from {upstream_repo}/{current_upstream_branch} to {upstream_repo}/{new_upstream_branch}"
+            f"[green]Moved upstream branch of {local} from {upstream_repo}/{current_upstream_branch} to {upstream_repo}/{new_upstream_branch}[/green]"
         )
         if self.enabled():
             local_branch = self.repo.heads[local]
@@ -196,9 +210,11 @@ class Repo:
         Delete a branch on an upstream repo
         NOT IMPLEMENTED
         """
-        self.log(f"Delete remote branch {upstream}/{upstream_branch}")
+        self.log(f"[green]Deleted remote branch {upstream}/{upstream_branch}[green]")
         if self.enabled():
-            print("gitmethods.Repo#delete_remote_branch unimplemented")
+            self.log(
+                "[red]gitmethods.Repo#delete_remote_branch is not implemented[/red]"
+            )
             # This does not work:
             # origin = self.repo.remotes.origin
             # origin.push(refspec=f":{upstream}") # Apparently, this deletes the remote branch
@@ -210,7 +226,9 @@ class Repo:
         Change remote default branch for an upstream repo
         May raise GitRemoteChangeDefaultError
         """
-        self.log(f"Change remote default branch to {upstream}/{upstream_branch}")
+        self.log(
+            f"[green]Changed remote default branch to {upstream}/{upstream_branch}[/green]"
+        )
         if self.enabled():
             result = subprocess.run(
                 [
@@ -255,8 +273,9 @@ class Repo:
         """Get the name of the upstream branch for a local branch"""
         parts = self.get_upstream_branch_parts(local_branch)
         if not parts:
-            return None
-        return parts["remote"]
+            res = None
+        res = parts["branch"]
+        return res
 
     def get_upstream_repository(self, local_branch: str) -> str | None:
         """Get the repository name of the upstream branch for a local branch"""
@@ -274,7 +293,8 @@ class Repo:
         if not qualified_name:
             return None
         if match := re.fullmatch(r"(.*)/(.*)", qualified_name):
-            return {"remote": match[1], "branch": match[2]}
+            res = {"remote": match[1], "branch": match[2]}
+            return res
         else:
             raise GitRemoteError(f"Unable to parse upstream branch {qualified_name}")
 
@@ -324,14 +344,23 @@ class Repo:
                 f"Error: Remote '{remote_name}' does not exist in {self.repo_path}"
             )
 
+    def set_upstream_url(self, url: str, upstream: str = "origin") -> None:
+        """Change the url of an upstream"""
+        remote = self.repo.remote(name=upstream)
+        remote.set_url(url)
+
     def logging(self) -> bool:
         """Should we be logging things?"""
         return self.verbose or self.dry_run
 
-    def log(self, message: str) -> None:
+    def log(self, message: str, mandatory=False) -> None:
         """Print things to the log if we're being verbose"""
-        if self.logging():
-            print(f"{self.repo_path}: {message}")
+        message = f"[white]{self.repo_path}:[/white] " + message
+        if not self.rich:
+            message = re.sub(r"\[/?\w+\]", "", message)
+
+        if mandatory or self.logging():
+            print(message)
 
     def enabled(self) -> None:
         """Are we actually executing changes, or just doing a dry run?"""
