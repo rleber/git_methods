@@ -35,15 +35,19 @@ class GitRemoteChangeDefaultError(GitRemoteError):
     pass
 
 
+class GitCopyError(GitError):
+    pass
+
+
 class GitMoveError(GitError):
     pass
 
 
-class GitMoveMissingBranchError(GitMoveError):
+class GitMissingBranchError(GitMoveError):
     pass
 
 
-class GitMoveBranchCollisionError(GitMoveError):
+class GitBranchCollisionError(GitMoveError):
     pass
 
 
@@ -149,11 +153,11 @@ class Repo:
     def move_local_branch(self, old: str, new: str) -> None:
         """
         Move (i.e. rename) a local branch
-        May raise GitMoveMissingBranchError, GitMoveBranchCollisionError,
+        May raise GitMissingBranchError, GitBranchCollisionError,
         or GitMoveError
         """
         if not (old in self.local_branches()):
-            raise GitMoveMissingBranchError(
+            raise GitMissingBranchError(
                 f"Can't find branch {old} in repo {self.repo_path}"
             )
         self.log(f"[green]Moved local branch {old} to {new}[/green]")
@@ -171,24 +175,73 @@ class Repo:
             except subprocess.CalledProcessError as e:
                 msg = e.stderr.strip()
                 if "Can't find branch" in msg:
-                    raise GitMoveMissingBranchError(f"Can't find branch {old}")
+                    raise GitMissingBranchError(f"Can't find branch {old}")
                 if "already exists" in msg:
-                    raise GitMoveBranchCollisionError(f"Branch {new} already exists")
+                    raise GitBranchCollisionError(f"Branch {new} already exists")
                 raise GitMoveError(f"Error renaming branch: {msg}")
 
-    def change_upstream_branch(self, local: str, new_upstream_branch: str) -> None:
+    def copy_local_branch(self, old: str, new: str) -> None:
+        """
+        Copy a local branch (i.e. checkout -b) to a new local branch
+        May raise GitMissingBranchError, GitBranchCollisionError,
+        or GitMoveError
+        """
+        if not (old in self.local_branches()):
+            raise GitMissingBranchError(
+                f"Can't find branch {old} in repo {self.repo_path}"
+            )
+        self.log(f"[green]Copied local branch {old} to {new}[/green]")
+        if self.enabled():
+            try:
+                os.chdir(self.repo_path)
+                subprocess.run(
+                    ["git", "checkout", old],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            except subprocess.CalledProcessError as e:
+                msg = e.stderr.strip()
+                if "Can't find branch" in msg:
+                    raise GitMissingBranchError(f"Can't find branch {old}")
+                if "already exists" in msg:
+                    raise GitBranchCollisionError(f"Branch {new} already exists")
+                raise GitCopyError(f"Error copying branch: {msg}")
+
+            try:
+                # Run the git checkout -b command
+                subprocess.run(
+                    ["git", "checkout", "-b", new],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+
+            except subprocess.CalledProcessError as e:
+                msg = e.stderr.strip()
+                if "already exists" in msg:
+                    raise GitBranchCollisionError(f"Branch {new} already exists")
+                raise GitCopyError(f"Error renaming branch: {msg}")
+
+    def change_upstream_branch(
+        self, local: str, new_upstream_branch: str, upstream: str | None = None
+    ) -> None:
         """
         Change the name of the upstream branch for a local branch
-        May raise GitRemoteUpstreamAlreadySet or GitMoveBranchCollisionError
+        May raise GitRemoteUpstreamAlreadySet or GitBranchCollisionError
         """
-        upstream_repo = self.get_upstream_repository(local)
+
+        if upstream is None:
+            upstream_repo = self.get_upstream_repository(local)
+        else:
+            upstream_repo = upstream
         current_upstream_branch = self.get_upstream_branch(local)
         if current_upstream_branch == new_upstream_branch:
             raise GitRemoteUpstreamAlreadySet(
                 f"Upstream branch is already {new_upstream_branch}"
             )
         if self.remote_branch_exists(new_upstream_branch, upstream=upstream_repo):
-            raise GitMoveBranchCollisionError(
+            raise GitBranchCollisionError(
                 f"Upstream branch {upstream_repo}/{new_upstream_branch} already exists"
             )
         self.log(
@@ -201,6 +254,18 @@ class Repo:
                 upstream_repo,
                 f"{local_branch.name}:{new_upstream_branch}",
             )
+
+    def create_remote(self, upstream: str = "origin", url=None) -> None:
+        """Delete a remote repository"""
+        self.repo.create_remote(upstream, url=url)
+
+    def rename_remote(self, old_upstream: str, new_upstream: str) -> None:
+        old_remote = self.repo.remote(name=old_upstream)
+        old_remote.rename(new_upstream)
+
+    def delete_remote(self, upstream: str = "origin") -> None:
+        """Delete a remote repository"""
+        self.repo.delete_remote(upstream)
 
     # TODO Implement this
     def delete_remote_branch(
@@ -272,9 +337,10 @@ class Repo:
     def get_upstream_branch(self, local_branch: str) -> str | None:
         """Get the name of the upstream branch for a local branch"""
         parts = self.get_upstream_branch_parts(local_branch)
-        if not parts:
+        if parts is None:
             res = None
-        res = parts["branch"]
+        else:
+            res = parts["branch"]
         return res
 
     def get_upstream_repository(self, local_branch: str) -> str | None:
@@ -290,7 +356,7 @@ class Repo:
         Returns a dict: {"remote": str, "branch": str}
         """
         qualified_name = self.get_qualified_upstream_branch(local_branch)
-        if not qualified_name:
+        if qualified_name is None:
             return None
         if match := re.fullmatch(r"(.*)/(.*)", qualified_name):
             res = {"remote": match[1], "branch": match[2]}

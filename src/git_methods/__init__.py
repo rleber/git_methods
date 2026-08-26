@@ -1,10 +1,11 @@
 __version__ = "0.0.1"
 
 from .git_methods import (
+    GitBranchCollisionError,  # noqa
+    GitCopyError,  # noqa
     GitError,  # noqa
-    GitMoveBranchCollisionError,  # noqa
+    GitMissingBranchError,  # noqa
     GitMoveError,  # noqa
-    GitMoveMissingBranchError,  # noqa
     GitNotRepo,  # noqa
     GitRemoteChangeDefaultError,  # noqa
     GitRemoteError,  # noqa
